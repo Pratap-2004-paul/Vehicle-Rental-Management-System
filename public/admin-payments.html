@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VRMS Admin - Payments</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .admin-layout { display: flex; width: 100%; min-height: calc(100vh - 65px); }
+  .sidebar { width: 220px; background: var(--navy); padding: 20px 0; flex-shrink: 0; }
+  .sidebar a { display: block; padding: 12px 24px; color: #cbd5e1; font-size: 14px; }
+  .sidebar a.active, .sidebar a:hover { background: var(--navy-light); color: #fff; border-left: 3px solid var(--orange); }
+  .main { flex: 1; padding: 30px; }
+  .main > * { max-width: 1100px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  th, td { padding: 12px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
+  .pill-paid { background: var(--success-bg); color: var(--success); }
+  .pill-pending { background: var(--warning-bg); color: var(--warning); }
+  .pill-failed { background: var(--danger-bg); color: var(--danger); }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo">VRMS Admin</div>
+  <ul class="nav-links"><li><a href="index.html">View Site</a></li></ul>
+  <div class="nav-actions"><button class="btn btn-primary" onclick="logout()">Logout</button></div>
+</nav>
+
+<div class="admin-layout">
+  <aside class="sidebar">
+    <a href="admin-dashboard.html">Dashboard</a>
+    <a href="admin-vehicles.html">Vehicles</a>
+    <a href="admin-bookings.html">Bookings</a>
+    <a href="admin-customers.html">Customers</a>
+    <a href="admin-payments.html" class="active">Payments</a>
+    <a href="#" onclick="logout()">Logout</a>
+  </aside>
+
+  <main class="main">
+    <h2 style="color:var(--navy); margin-bottom:20px;">Payments</h2>
+    <div id="tableWrap"><div class="loading">Loading payments...</div></div>
+  </main>
+</div>
+
+<script src="js/toast.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+requireAdmin();
+
+async function loadPayments() {
+  const wrap = document.getElementById('tableWrap');
+  try {
+    const payments = await api.get('/admin/payments');
+    if (!payments.length) { wrap.innerHTML = '<div class="empty-state">No payments yet.</div>'; return; }
+
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>#</th><th>Customer</th><th>Vehicle</th><th>Amount</th><th>Method</th><th>Status</th><th>Transaction ID</th><th>Date</th></tr></thead>
+        <tbody>
+          ${payments.map((p, i) => `
+            <tr>
+              <td>${i+1}</td>
+              <td>${p.booking?.user?.name || '—'}</td>
+              <td>${p.booking?.vehicle?.name || '—'}</td>
+              <td>₹${Number(p.amount).toLocaleString('en-IN')}</td>
+              <td>${formatMethod(p.method)}</td>
+              <td><span class="pill pill-${p.status}">${p.status}</span></td>
+              <td>${p.transaction_id || '—'}</td>
+              <td>${formatDate(p.created_at)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (e) {
+    wrap.innerHTML = '<div class="empty-state">Could not load payments.</div>';
+  }
+}
+
+function formatMethod(m) {
+  return { upi: 'UPI', card: 'Card', net_banking: 'Net Banking', cash_on_delivery: 'Cash on Delivery' }[m] || m;
+}
+
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+loadPayments();
+</script>
+</body>
+</html>

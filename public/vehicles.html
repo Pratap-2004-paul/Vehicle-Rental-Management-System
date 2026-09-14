@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VRMS - Available Vehicles</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .listing-layout { display: flex; gap: 24px; padding: 30px 24px; max-width: 1200px; margin: 0 auto; }
+  .filters { width: 240px; flex-shrink: 0; }
+  .filters h3 { margin-bottom: 16px; color: var(--navy); }
+  .results { flex: 1; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo">VRMS</div>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="vehicles.html">Vehicles</a></li>
+    <li><a href="about.html">About Us</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <div class="nav-actions" id="navGuestActions">
+    <a href="login.html" class="btn btn-outline">Login</a>
+    <a href="register.html" class="btn btn-primary">Register</a>
+  </div>
+  <div class="nav-actions hidden" id="navUserActions">
+    <a href="dashboard.html" class="btn btn-outline" id="navUserName">Dashboard</a>
+    <button class="btn btn-primary" onclick="logout()">Logout</button>
+  </div>
+</nav>
+
+<div class="listing-layout">
+  <aside class="filters card">
+    <h3>Filters</h3>
+    <div class="form-group">
+      <label>Vehicle Type</label>
+      <select id="fType">
+        <option value="">All Types</option>
+        <option value="Car">Car</option>
+        <option value="Bike">Bike</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Fuel Type</label>
+      <select id="fFuel">
+        <option value="">All Fuel</option>
+        <option value="Petrol">Petrol</option>
+        <option value="Diesel">Diesel</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Transmission</label>
+      <select id="fTransmission">
+        <option value="">All Transmission</option>
+        <option value="Manual">Manual</option>
+        <option value="Automatic">Automatic</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Max Price / day: ₹<span id="priceLabel">10000</span></label>
+      <input type="range" id="fMaxPrice" min="500" max="10000" step="100" value="10000"
+             oninput="document.getElementById('priceLabel').textContent = this.value">
+    </div>
+    <button class="btn btn-primary btn-block" onclick="loadVehicles(1)">Filter</button>
+  </aside>
+
+  <section class="results">
+    <h2 style="color:var(--navy); margin-bottom:16px;">Available Vehicles</h2>
+    <div class="grid-vehicles" id="vehicleGrid">
+      <div class="loading">Loading vehicles...</div>
+    </div>
+    <div class="flex gap-10 mt-20" id="pagination" style="justify-content:center;"></div>
+  </section>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+
+<script>
+async function loadVehicles(page = 1) {
+  const grid = document.getElementById('vehicleGrid');
+  grid.innerHTML = '<div class="loading">Loading vehicles...</div>';
+
+  const params = new URLSearchParams();
+  params.set('page', page);
+  const type = document.getElementById('fType').value;
+  const fuel = document.getElementById('fFuel').value;
+  const transmission = document.getElementById('fTransmission').value;
+  const maxPrice = document.getElementById('fMaxPrice').value;
+  if (type) params.set('type', type);
+  if (fuel) params.set('fuel_type', fuel);
+  if (transmission) params.set('transmission', transmission);
+  if (maxPrice) params.set('max_price', maxPrice);
+
+  try {
+    const data = await api.get('/vehicles?' + params.toString());
+    const vehicles = data.data || data;
+
+    if (!vehicles.length) {
+      grid.innerHTML = '<div class="empty-state">No vehicles match your filters.</div>';
+      document.getElementById('pagination').innerHTML = '';
+      return;
+    }
+
+    grid.innerHTML = vehicles.map(v => `
+      <a href="vehicle-details.html?id=${v.id}" class="vehicle-card">
+        <span class="badge ${v.status === 'available' ? 'badge-available' : v.status === 'maintenance' ? 'badge-maintenance' : 'badge-unavailable'}">${v.status}</span>
+        <img src="${v.image || 'https://images.unsplash.com/photo-1502877338535-766e1452684a?w=400'}" alt="${v.name}">
+        <div class="body">
+          <div class="name">${v.name}</div>
+          <div class="price">₹${v.price_per_day} / day</div>
+          <div class="meta">${v.fuel_type} · ${v.transmission}</div>
+        </div>
+      </a>`).join('');
+
+    renderPagination(data);
+  } catch (e) {
+    grid.innerHTML = '<div class="empty-state">Could not load vehicles. Is the server running?</div>';
+  }
+}
+
+function renderPagination(data) {
+  const el = document.getElementById('pagination');
+  if (!data.last_page || data.last_page <= 1) { el.innerHTML = ''; return; }
+  let html = '';
+  for (let i = 1; i <= data.last_page; i++) {
+    html += `<button class="btn ${i === data.current_page ? 'btn-primary' : 'btn-outline'}" onclick="loadVehicles(${i})">${i}</button>`;
+  }
+  el.innerHTML = html;
+}
+
+// Pre-fill filters from URL (e.g. coming from home page search) — location/date not filtered server-side yet
+loadVehicles(1);
+</script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VRMS - Dashboard</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .dash-layout { display: flex; width: 100%; min-height: calc(100vh - 65px); }
+  .sidebar { width: 220px; background: var(--navy); min-height: calc(100vh - 65px); padding: 20px 0; flex-shrink: 0; }
+  .sidebar a { display: block; padding: 12px 24px; color: #cbd5e1; font-size: 14px; }
+  .sidebar a.active, .sidebar a:hover { background: var(--navy-light); color: #fff; border-left: 3px solid var(--orange); }
+  .main { flex: 1; padding: 30px; }
+.main > * { max-width: 1100px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; }
+  .stat-card .label { font-size:12px; color:var(--text-muted); margin-bottom:6px; }
+  .stat-card .value { font-size:22px; font-weight:700; color:var(--navy); }
+  .two-col { display:flex; gap:20px; flex-wrap:wrap; }
+  .two-col > div { flex:1; min-width:280px; }
+  .booking-row { display:flex; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); }
+  .booking-row img { width:60px; height:45px; object-fit:cover; border-radius:6px; }
+  .booking-row .info { flex:1; font-size:13px; }
+  .booking-row .amount { font-weight:600; color:var(--navy); }
+  @media (max-width: 800px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo">VRMS</div>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="vehicles.html">Vehicles</a></li>
+  </ul>
+  <div class="nav-actions hidden" id="navUserActions">
+    <a href="dashboard.html" class="btn btn-outline" id="navUserName">Dashboard</a>
+    <button class="btn btn-primary" onclick="logout()">Logout</button>
+  </div>
+  <div class="nav-actions" id="navGuestActions">
+    <a href="login.html" class="btn btn-outline">Login</a>
+  </div>
+</nav>
+
+<div class="dash-layout">
+  <aside class="sidebar">
+    <a href="dashboard.html" class="active">Dashboard</a>
+    <a href="my-bookings.html">My Bookings</a>
+    <a href="payment.html">My Payments</a>
+    <a href="profile.html">My Profile</a>
+    <a href="#">Change Password</a>
+    <a href="#" onclick="logout()">Logout</a>
+  </aside>
+
+  <main class="main">
+    <h2 style="color:var(--navy); margin-bottom:4px;" id="welcomeMsg">Welcome back!</h2>
+    <p style="color:var(--text-muted); margin-bottom:24px;">Here's what's happening with your bookings.</p>
+
+    <div class="stats-grid" id="statsGrid">
+      <div class="loading">Loading stats...</div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <h3 style="margin-bottom:12px; color:var(--navy);">Upcoming Booking</h3>
+        <div id="upcomingBooking"><div class="loading">Loading...</div></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:12px; color:var(--navy);">Recent Bookings</h3>
+        <div id="recentBookings"><div class="loading">Loading...</div></div>
+        <a href="my-bookings.html" class="btn btn-outline btn-block mt-20">View All</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+
+<script>
+requireAuth();
+
+async function loadDashboard() {
+  try {
+    const user = await api.get('/me');
+    setCurrentUser(user);
+    document.getElementById('welcomeMsg').textContent = `Welcome back, ${user.name}!`;
+
+    const bookings = await api.get('/bookings');
+
+    renderStats(bookings);
+    renderUpcoming(bookings);
+    renderRecent(bookings);
+  } catch (e) {
+    document.getElementById('statsGrid').innerHTML = '<div class="empty-state">Could not load dashboard.</div>';
+  }
+}
+
+function renderStats(bookings) {
+  const total = bookings.length;
+  const upcoming = bookings.filter(b => ['pending','upcoming','approved'].includes(b.status)).length;
+  const completed = bookings.filter(b => b.status === 'completed').length;
+  const totalSpent = bookings
+    .filter(b => b.status !== 'cancelled')
+    .reduce((sum, b) => sum + Number(b.total_amount), 0);
+
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card"><div class="label">Total Bookings</div><div class="value">${total}</div></div>
+    <div class="stat-card"><div class="label">Upcoming Bookings</div><div class="value">${upcoming}</div></div>
+    <div class="stat-card"><div class="label">Completed Bookings</div><div class="value">${completed}</div></div>
+    <div class="stat-card"><div class="label">Total Spent</div><div class="value">₹${totalSpent.toLocaleString('en-IN')}</div></div>
+  `;
+}
+
+function renderUpcoming(bookings) {
+  const upcoming = bookings.find(b => ['pending','upcoming','approved'].includes(b.status));
+  const box = document.getElementById('upcomingBooking');
+  if (!upcoming) {
+    box.innerHTML = '<div class="empty-state" style="padding:20px 0;">No upcoming bookings.</div>';
+    return;
+  }
+  const v = upcoming.vehicle;
+  box.innerHTML = `
+    <div class="booking-row">
+      <img src="${v?.image || 'https://images.unsplash.com/photo-1502877338535-766e1452684a?w=200'}" alt="${v?.name || ''}">
+      <div class="info">
+        <div style="font-weight:600;">${v?.name || 'Vehicle'}</div>
+        <div style="color:var(--text-muted);">${formatDate(upcoming.pickup_date)} - ${formatDate(upcoming.return_date)}</div>
+      </div>
+      <div class="amount">₹${Number(upcoming.total_amount).toLocaleString('en-IN')}</div>
+    </div>
+    <a href="my-bookings.html" class="btn btn-outline btn-block mt-20">View Details</a>
+  `;
+}
+
+function renderRecent(bookings) {
+  const recent = bookings.slice(0, 3);
+  const box = document.getElementById('recentBookings');
+  if (!recent.length) {
+    box.innerHTML = '<div class="empty-state" style="padding:20px 0;">No bookings yet.</div>';
+    return;
+  }
+  box.innerHTML = recent.map(b => `
+    <div class="booking-row">
+      <img src="${b.vehicle?.image || 'https://images.unsplash.com/photo-1502877338535-766e1452684a?w=200'}" alt="">
+      <div class="info">
+        <div style="font-weight:600;">${b.vehicle?.name || 'Vehicle'}</div>
+        <div style="color:var(--text-muted);">${formatDate(b.pickup_date)} - ${formatDate(b.return_date)}</div>
+      </div>
+      <span class="pill pill-${b.status}">${b.status}</span>
+    </div>
+  `).join('');
+}
+
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

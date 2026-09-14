@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VRMS - Vehicle Details</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .breadcrumb { font-size: 13px; color: var(--text-muted); padding: 16px 24px; max-width: 1200px; margin: 0 auto; }
+  .breadcrumb a { color: var(--blue-link); }
+  .details-layout { display: flex; gap: 30px; padding: 0 24px 40px; max-width: 1200px; margin: 0 auto; flex-wrap: wrap; }
+  .details-left { flex: 1.4; min-width: 320px; }
+  .details-right { flex: 1; min-width: 280px; }
+  .main-image { border-radius: var(--radius); overflow: hidden; margin-bottom: 12px; box-shadow: var(--shadow); }
+  .main-image img { width: 100%; height: 340px; object-fit: cover; }
+  .thumb-strip { display: flex; gap: 10px; }
+  .thumb-strip img { width: 70px; height: 55px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid transparent; }
+  .thumb-strip img.active { border-color: var(--orange); }
+  .tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--border); margin: 24px 0 16px; }
+  .tab-btn { padding: 10px 0; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; background:none; border-top:none; border-left:none; border-right:none; font-size:14px; }
+  .tab-btn.active { color: var(--navy); border-bottom-color: var(--orange); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .features-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; }
+  .price-box h2 { color: var(--orange-dark); font-size: 28px; margin: 6px 0 16px; }
+  .spec-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 14px; color: var(--text-dark); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); display:inline-block; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo">VRMS</div>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="vehicles.html">Vehicles</a></li>
+    <li><a href="about.html">About Us</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <div class="nav-actions" id="navGuestActions">
+    <a href="login.html" class="btn btn-outline">Login</a>
+    <a href="register.html" class="btn btn-primary">Register</a>
+  </div>
+  <div class="nav-actions hidden" id="navUserActions">
+    <a href="dashboard.html" class="btn btn-outline" id="navUserName">Dashboard</a>
+    <button class="btn btn-primary" onclick="logout()">Logout</button>
+  </div>
+</nav>
+
+<div class="breadcrumb">
+  <a href="index.html">Home</a> / <a href="vehicles.html">Vehicles</a> / <span id="crumbName">Vehicle</span>
+</div>
+
+<div id="content" class="details-layout">
+  <div class="loading">Loading vehicle...</div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+ 
+<script>
+const params = new URLSearchParams(window.location.search);
+const vehicleId = params.get('id');
+let currentVehicle = null;
+
+async function loadVehicle() {
+  const content = document.getElementById('content');
+  if (!vehicleId) {
+    content.innerHTML = '<div class="empty-state">No vehicle selected.</div>';
+    return;
+  }
+
+  try {
+    const v = await api.get('/vehicles/' + vehicleId);
+    currentVehicle = v;
+    document.getElementById('crumbName').textContent = v.name;
+    document.title = 'VRMS - ' + v.name;
+    render(v);
+  } catch (e) {
+    content.innerHTML = '<div class="empty-state">Vehicle not found.</div>';
+  }
+}
+
+function render(v) {
+  const gallery = [v.image, ...(v.gallery || [])].filter(Boolean);
+  const mainImg = gallery[0] || 'https://images.unsplash.com/photo-1502877338535-766e1452684a?w=800';
+  const features = (v.features || []);
+  const featuresHTML = features.length
+    ? features.map(f => `<div>✔ ${f}</div>`).join('')
+    : '<div>No listed features.</div>';
+
+  const thumbs = gallery.map((img, i) => `<img src="${img}" class="${i===0?'active':''}" onclick="swapImage('${img}', this)">`).join('');
+
+  document.getElementById('content').innerHTML = `
+    <div class="details-left">
+      <div class="main-image"><img id="mainImg" src="${mainImg}" alt="${v.name}"></div>
+      <div class="thumb-strip">${thumbs}</div>
+
+      <div class="tabs">
+        <button class="tab-btn active" onclick="showTab('desc', this)">Description</button>
+        <button class="tab-btn" onclick="showTab('feat', this)">Features</button>
+        <button class="tab-btn" onclick="showTab('policy', this)">Policy</button>
+      </div>
+      <div id="desc" class="tab-panel active">
+        <p>${v.description || (v.name + ' is a great choice for your trip. Comfortable, reliable, and ready to drive.')}</p>
+      </div>
+      <div id="feat" class="tab-panel">
+        <div class="features-list">${featuresHTML}</div>
+      </div>
+      <div id="policy" class="tab-panel">
+        <p>Free cancellation up to 24 hours before pickup. Valid driving license required at pickup. Fuel charges are not included in the rental price.</p>
+      </div>
+    </div>
+
+    <div class="details-right">
+      <div class="card price-box">
+        <div style="font-weight:600; font-size:18px;">${v.name}</div>
+        <h2>₹${v.price_per_day} / day</h2>
+        <div class="spec-row">${v.fuel_type}</div>
+        <div class="spec-row">${v.transmission}</div>
+        <div class="spec-row">${v.seats ? v.seats + ' Seater' : ''}</div>
+        <div class="spec-row">${v.model_year ? v.model_year + ' Model' : ''}</div>
+        <div class="spec-row"><span class="status-dot" style="background:${v.status==='available' ? 'var(--success)' : 'var(--danger)'}"></span> ${v.status === 'available' ? 'Available' : v.status}</div>
+
+        <button class="btn btn-primary btn-block mt-20" ${v.status !== 'available' ? 'disabled' : ''} onclick="bookNow()">
+          ${v.status === 'available' ? 'Book Now' : 'Not Available'}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function swapImage(src, el) {
+  document.getElementById('mainImg').src = src;
+  document.querySelectorAll('.thumb-strip img').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function showTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function bookNow() {
+  if (!isLoggedIn()) {
+    window.location.href = 'login.html?redirect=vehicle-details.html?id=' + vehicleId;
+    return;
+  }
+  window.location.href = 'booking.html?vehicle_id=' + vehicleId;
+}
+
+loadVehicle();
+</script>
+</body>
+</html>

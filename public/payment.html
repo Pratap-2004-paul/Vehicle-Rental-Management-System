@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VRMS - Payment</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .pay-layout { display:flex; gap:30px; max-width:900px; margin:0 auto; padding:30px 24px; flex-wrap:wrap; }
+  .pay-summary { flex:1; min-width:260px; }
+  .pay-methods { flex:1.2; min-width:300px; }
+  .method-option { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--border); border-radius:8px; margin-bottom:10px; cursor:pointer; }
+  .method-option.selected { border-color:var(--navy); background:var(--bg-light); }
+  .summary-row { display:flex; justify-content:space-between; padding:8px 0; font-size:14px; border-bottom:1px solid var(--border); }
+  .summary-row.total { font-weight:700; font-size:18px; color:var(--navy); border-bottom:none; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo">VRMS</div>
+  <ul class="nav-links"><li><a href="index.html">Home</a></li></ul>
+  <div class="nav-actions hidden" id="navUserActions">
+    <a href="dashboard.html" class="btn btn-outline" id="navUserName">Dashboard</a>
+    <button class="btn btn-primary" onclick="logout()">Logout</button>
+  </div>
+  <div class="nav-actions" id="navGuestActions"><a href="login.html" class="btn btn-outline">Login</a></div>
+</nav>
+
+<div class="pay-layout" id="payLayout">
+  <div class="loading">Loading booking...</div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+
+<script>
+requireAuth();
+
+const params = new URLSearchParams(window.location.search);
+const bookingId = params.get('booking_id');
+let selectedMethod = 'upi';
+
+async function loadBooking() {
+  const layout = document.getElementById('payLayout');
+  if (!bookingId) { layout.innerHTML = '<div class="empty-state">No booking selected.</div>'; return; }
+
+  try {
+    const b = await api.get('/bookings/' + bookingId + '/payment');
+    const alreadyPaid = b.payment && b.payment.status === 'paid';
+
+    layout.innerHTML = `
+      <div class="pay-summary card">
+        <h3 style="color:var(--navy); margin-bottom:12px;">Payment for Booking #${b.id}</h3>
+        <div class="summary-row"><span>Vehicle</span><span>${b.vehicle?.name || ''}</span></div>
+        <div class="summary-row"><span>From - To</span><span>${formatDate(b.pickup_date)} - ${formatDate(b.return_date)}</span></div>
+        <div class="summary-row total"><span>Total Amount</span><span>₹${Number(b.total_amount).toLocaleString('en-IN')}</span></div>
+      </div>
+      <div class="pay-methods card">
+        <h3 style="color:var(--navy); margin-bottom:12px;">Payment Method</h3>
+        ${alreadyPaid ? `<div class="empty-state">Already paid via ${b.payment.method}. Transaction: ${b.payment.transaction_id}</div>` : `
+          <div id="methodOptions">
+            <label class="method-option selected"><input type="radio" name="method" value="upi" checked> UPI</label>
+            <label class="method-option"><input type="radio" name="method" value="card"> Credit / Debit Card</label>
+            <label class="method-option"><input type="radio" name="method" value="net_banking"> Net Banking</label>
+            <label class="method-option"><input type="radio" name="method" value="cash_on_delivery"> Cash on Delivery</label>
+          </div>
+          <div id="payError" class="form-error hidden"></div>
+          <button class="btn btn-primary btn-block mt-20" id="payBtn" onclick="pay()">Pay ₹${Number(b.total_amount).toLocaleString('en-IN')}</button>
+        `}
+      </div>
+    `;
+
+    if (!alreadyPaid) {
+      document.querySelectorAll('input[name="method"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+          selectedMethod = e.target.value;
+          document.querySelectorAll('.method-option').forEach(el => el.classList.remove('selected'));
+          e.target.closest('.method-option').classList.add('selected');
+        });
+      });
+    }
+  } catch (e) {
+    layout.innerHTML = '<div class="empty-state">Could not load booking.</div>';
+  }
+}
+
+async function pay() {
+  const btn = document.getElementById('payBtn');
+  const errorBox = document.getElementById('payError');
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
+
+  try {
+    await api.post('/bookings/' + bookingId + '/payment', { method: selectedMethod });
+    window.location.href = 'my-bookings.html';
+  } catch (e) {
+    errorBox.textContent = e.message || 'Payment failed';
+    errorBox.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Try Again';
+  }
+}
+
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+loadBooking();
+</script>
+</body>
+</html>

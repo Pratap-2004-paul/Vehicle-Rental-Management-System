@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VRMS - Find The Perfect Vehicle</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo">VRMS</div>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="vehicles.html">Vehicles</a></li>
+    <li><a href="about.html">About Us</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <div class="nav-actions" id="navGuestActions">
+    <a href="login.html" class="btn btn-outline">Login</a>
+    <a href="register.html" class="btn btn-primary">Register</a>
+  </div>
+  <div class="nav-actions hidden" id="navUserActions">
+    <a href="dashboard.html" class="btn btn-outline" id="navUserName">Dashboard</a>
+    <button class="btn btn-primary" onclick="logout()">Logout</button>
+  </div>
+</nav>
+
+<section class="hero">
+  <h1>Find The Perfect Vehicle For Your Journey</h1>
+  <p>Choose from a wide range of cars and bikes. Book easily and enjoy your trip.</p>
+  <a href="vehicles.html" class="btn btn-accent" style="margin-bottom:24px;display:inline-block;">Book Now</a>
+
+  <div class="search-bar">
+    <div class="field">
+      <label>Pick-up Location</label>
+      <input type="text" id="heroLocation" placeholder="Select location">
+    </div>
+    <div class="field">
+      <label>Pick-up Date</label>
+      <input type="date" id="heroPickup">
+    </div>
+    <div class="field">
+      <label>Return Date</label>
+      <input type="date" id="heroReturn">
+    </div>
+    <button class="btn btn-primary" onclick="searchVehicles()">Search Vehicle</button>
+  </div>
+</section>
+
+<section class="features-strip">
+  <div class="feature"><strong>Best Price Guaranteed</strong></div>
+  <div class="feature"><strong>Wide Range of Vehicles</strong></div>
+  <div class="feature"><strong>Easy Booking Process</strong></div>
+  <div class="feature"><strong>24/7 Customer Support</strong></div>
+</section>
+
+<section class="container" style="padding:40px 24px;">
+  <h2 style="color:var(--navy); margin-bottom:20px;">Available Vehicles</h2>
+  <div class="grid-vehicles" id="popularVehicles">
+    <div class="loading">Loading vehicles...</div>
+  </div>
+</section>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+function searchVehicles() {
+  const location = document.getElementById('heroLocation').value;
+  const pickup = document.getElementById('heroPickup').value;
+  const ret = document.getElementById('heroReturn').value;
+  const params = new URLSearchParams();
+  if (location) params.set('location', location);
+  if (pickup) params.set('pickup', pickup);
+  if (ret) params.set('return', ret);
+  window.location.href = 'vehicles.html?' + params.toString();
+}
+
+async function loadPopularVehicles() {
+  const container = document.getElementById('popularVehicles');
+  try {
+    const data = await api.get('/vehicles?per_page=100');
+    const vehicles = data.data || data; // handles paginated or plain array response
+    if (!vehicles.length) {
+      container.innerHTML = '<div class="empty-state">No vehicles available right now.</div>';
+      return;
+    }
+        container.innerHTML = vehicles.map(vehicleCardHTML).join('');
+  } catch (e) {
+    container.innerHTML = '<div class="empty-state">Could not load vehicles.</div>';
+  }
+}
+
+function vehicleCardHTML(v) {
+  const badgeClass = v.status === 'available' ? 'badge-available'
+                    : v.status === 'maintenance' ? 'badge-maintenance' : 'badge-unavailable';
+  const image = v.image || 'https://images.unsplash.com/photo-1502877338535-766e1452684a?w=400';
+  return `
+    <a href="vehicle-details.html?id=${v.id}" class="vehicle-card">
+      <span class="badge ${badgeClass}">${v.status}</span>
+      <img src="${image}" alt="${v.name}">
+      <div class="body">
+        <div class="name">${v.name}</div>
+        <div class="price">₹${v.price_per_day} / day</div>
+        <div class="meta">${v.fuel_type} · ${v.transmission}</div>
+      </div>
+    </a>`;
+}
+
+loadPopularVehicles();
+</script>
+</body>
+</html>

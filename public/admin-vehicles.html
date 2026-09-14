@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VRMS Admin - Manage Vehicles</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .admin-layout { display: flex; width: 100%; min-height: calc(100vh - 65px); }
+  .sidebar { width: 220px; background: var(--navy); min-height: calc(100vh - 65px); padding: 20px 0; flex-shrink: 0; }
+  .sidebar a { display: block; padding: 12px 24px; color: #cbd5e1; font-size: 14px; }
+  .sidebar a.active, .sidebar a:hover { background: var(--navy-light); color: #fff; border-left: 3px solid var(--orange); }
+  .main { flex: 1; padding: 30px; }
+.main > * { max-width: 1100px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  th, td { padding: 12px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
+  td img { width:50px; height:38px; object-fit:cover; border-radius:4px; }
+  .link-btn { color: var(--blue-link); font-weight: 600; cursor: pointer; background:none; border:none; font-size:13px; }
+  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; z-index:50; }
+  .modal-box { background:#fff; border-radius:var(--radius); padding:24px; width:100%; max-width:420px; max-height:85vh; overflow-y:auto; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo">VRMS Admin</div>
+  <ul class="nav-links"><li><a href="index.html">View Site</a></li></ul>
+  <div class="nav-actions"><button class="btn btn-primary" onclick="logout()">Logout</button></div>
+</nav>
+
+<div class="admin-layout">
+  <aside class="sidebar">
+    <a href="admin-dashboard.html">Dashboard</a>
+    <a href="admin-vehicles.html" class="active">Vehicles</a>
+    <a href="admin-bookings.html">Bookings</a>
+    <a href="admin-customers.html">Customers</a>
+    <a href="admin-payments.html">Payments</a>
+    <a href="#" onclick="logout()">Logout</a>
+  </aside>
+
+  <main class="main">
+    <div class="flex" style="justify-content:space-between; align-items:center; margin-bottom:20px;">
+      <h2 style="color:var(--navy);">Manage Vehicles</h2>
+      <button class="btn btn-accent" onclick="openModal()">+ Add Vehicle</button>
+    </div>
+    <div id="tableWrap"><div class="loading">Loading vehicles...</div></div>
+  </main>
+</div>
+
+<div id="modal" class="modal-backdrop hidden">
+  <div class="modal-box">
+    <h3 style="color:var(--navy); margin-bottom:16px;" id="modalTitle">Add Vehicle</h3>
+    <div id="modalError" class="form-error hidden"></div>
+    <form id="vehicleForm">
+      <input type="hidden" id="vId">
+      <div class="form-group"><label>Vehicle Name</label><input type="text" id="vName" required></div>
+      <div class="form-group"><label>Type</label>
+        <select id="vType"><option value="Car">Car</option><option value="Bike">Bike</option></select>
+      </div>
+      <div class="form-group"><label>Fuel Type</label>
+        <select id="vFuel"><option value="Petrol">Petrol</option><option value="Diesel">Diesel</option></select>
+      </div>
+      <div class="form-group"><label>Transmission</label>
+        <select id="vTransmission"><option value="Manual">Manual</option><option value="Automatic">Automatic</option></select>
+      </div>
+      <div class="form-group"><label>Price / day (₹)</label><input type="number" id="vPrice" required></div>
+      <div class="form-group"><label>Seats</label><input type="number" id="vSeats"></div>
+      <div class="form-group"><label>Model Year</label><input type="number" id="vYear"></div>
+      <div class="form-group"><label>Image URL</label><input type="text" id="vImage" placeholder="https://..."></div>
+      <div class="form-group"><label>Status</label>
+        <select id="vStatus"><option value="available">Available</option><option value="maintenance">Maintenance</option><option value="unavailable">Unavailable</option></select>
+      </div>
+      <div class="flex gap-10 mt-10">
+        <button type="submit" class="btn btn-primary btn-block" id="saveBtn">Save</button>
+        <button type="button" class="btn btn-outline btn-block" onclick="closeModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+requireAdmin();
+
+async function loadVehicles() {
+  const wrap = document.getElementById('tableWrap');
+  try {
+    const data = await api.get('/vehicles?all=1');
+    const vehicles = data.data || data;
+    if (!vehicles.length) { wrap.innerHTML = '<div class="empty-state">No vehicles yet.</div>'; return; }
+
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>#</th><th>Image</th><th>Vehicle Name</th><th>Price / Day</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+          ${vehicles.map((v, i) => `
+            <tr>
+              <td>${i+1}</td>
+              <td><img src="${v.image || 'https://images.unsplash.com/photo-1502877338535-766e1452684a?w=200'}"></td>
+              <td>${v.name}</td>
+              <td>₹${v.price_per_day}</td>
+              <td><span class="pill ${v.status==='available'?'pill-approved':v.status==='maintenance'?'pill-pending':'pill-cancelled'}">${v.status}</span></td>
+              <td>
+                <button class="link-btn" onclick='editVehicle(${JSON.stringify(v)})'>Edit</button>
+                <button class="link-btn" style="color:var(--danger); margin-left:10px;" onclick="deleteVehicle(${v.id})">Delete</button>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (e) {
+    wrap.innerHTML = '<div class="empty-state">Could not load vehicles.</div>';
+  }
+}
+
+function openModal() {
+  document.getElementById('modalTitle').textContent = 'Add Vehicle';
+  document.getElementById('vehicleForm').reset();
+  document.getElementById('vId').value = '';
+  document.getElementById('modalError').classList.add('hidden');
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+function editVehicle(v) {
+  document.getElementById('modalTitle').textContent = 'Edit Vehicle';
+  document.getElementById('vId').value = v.id;
+  document.getElementById('vName').value = v.name;
+  document.getElementById('vType').value = v.type;
+  document.getElementById('vFuel').value = v.fuel_type;
+  document.getElementById('vTransmission').value = v.transmission;
+  document.getElementById('vPrice').value = v.price_per_day;
+  document.getElementById('vSeats').value = v.seats || '';
+  document.getElementById('vYear').value = v.model_year || '';
+  document.getElementById('vImage').value = v.image || '';
+  document.getElementById('vStatus').value = v.status;
+  document.getElementById('modalError').classList.add('hidden');
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.add('hidden');
+}
+
+document.getElementById('vehicleForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorBox = document.getElementById('modalError');
+  const btn = document.getElementById('saveBtn');
+  errorBox.classList.add('hidden');
+
+  const id = document.getElementById('vId').value;
+  const payload = {
+    name: document.getElementById('vName').value,
+    type: document.getElementById('vType').value,
+    fuel_type: document.getElementById('vFuel').value,
+    transmission: document.getElementById('vTransmission').value,
+    price_per_day: document.getElementById('vPrice').value,
+    seats: document.getElementById('vSeats').value || null,
+    model_year: document.getElementById('vYear').value || null,
+    image: document.getElementById('vImage').value || null,
+    status: document.getElementById('vStatus').value,
+  };
+
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  try {
+    if (id) {
+      await api.put('/vehicles/' + id, payload);
+    } else {
+      await api.post('/vehicles', payload);
+    }
+    closeModal();
+    loadVehicles();
+  } catch (err) {
+    let message = err.message;
+    if (err.errors) message = Object.values(err.errors).flat().join(' ');
+    errorBox.textContent = message;
+    errorBox.classList.remove('hidden');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save';
+  }
+});
+
+async function deleteVehicle(id) {
+  if (!confirm('Delete this vehicle? This cannot be undone.')) return;
+  try {
+    await api.delete('/vehicles/' + id);
+    loadVehicles();
+  } catch (e) {
+    alert(e.message || 'Could not delete vehicle');
+  }
+}
+
+loadVehicles();
+</script>
+</body>
+</html>

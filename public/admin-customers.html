@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VRMS Admin - Manage Customers</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .admin-layout { display: flex; width: 100%; min-height: calc(100vh - 65px); }
+  .sidebar { width: 220px; background: var(--navy); padding: 20px 0; flex-shrink: 0; }
+  .sidebar a { display: block; padding: 12px 24px; color: #cbd5e1; font-size: 14px; }
+  .sidebar a.active, .sidebar a:hover { background: var(--navy-light); color: #fff; border-left: 3px solid var(--orange); }
+  .main { flex: 1; padding: 30px; }
+  .main > * { max-width: 1100px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  th, td { padding: 12px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
+  .link-btn { color: var(--blue-link); font-weight: 600; cursor: pointer; background:none; border:none; font-size:13px; }
+  .pill-pending-status { background: var(--warning-bg); color: var(--warning); }
+  .pill-approved-status { background: var(--success-bg); color: var(--success); }
+  .pill-blocked-status { background: var(--danger-bg); color: var(--danger); }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo">VRMS Admin</div>
+  <ul class="nav-links"><li><a href="index.html">View Site</a></li></ul>
+  <div class="nav-actions"><button class="btn btn-primary" onclick="logout()">Logout</button></div>
+</nav>
+
+<div class="admin-layout">
+  <aside class="sidebar">
+    <a href="admin-dashboard.html">Dashboard</a>
+    <a href="admin-vehicles.html">Vehicles</a>
+    <a href="admin-bookings.html">Bookings</a>
+    <a href="admin-customers.html" class="active">Customers</a>
+    <a href="admin-payments.html">Payments</a>
+    <a href="#" onclick="logout()">Logout</a>
+  </aside>
+
+  <main class="main">
+    <h2 style="color:var(--navy); margin-bottom:20px;">Manage Customers</h2>
+    <div id="tableWrap"><div class="loading">Loading customers...</div></div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+requireAdmin();
+
+async function loadCustomers() {
+  const wrap = document.getElementById('tableWrap');
+  try {
+    const customers = await api.get('/admin/customers');
+    if (!customers.length) { wrap.innerHTML = '<div class="empty-state">No customers yet.</div>'; return; }
+
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Bookings</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+          ${customers.map((c, i) => `
+            <tr>
+              <td>${i+1}</td>
+              <td>${c.name}</td>
+              <td>${c.email}</td>
+              <td>${c.phone || '—'}</td>
+              <td>${c.bookings_count}</td>
+              <td><span class="pill pill-${c.status}-status">${c.status}</span></td>
+              <td>
+                ${c.status !== 'approved' ? `<button class="link-btn" onclick="setStatus(${c.id}, 'approved')">Approve</button>` : ''}
+                ${c.status !== 'blocked' ? `<button class="link-btn" style="color:var(--danger); margin-left:8px;" onclick="setStatus(${c.id}, 'blocked')">Block</button>` : `<button class="link-btn" onclick="setStatus(${c.id}, 'approved')">Unblock</button>`}
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (e) {
+    wrap.innerHTML = '<div class="empty-state">Could not load customers.</div>';
+  }
+}
+
+async function setStatus(id, status) {
+  try {
+    await api.put('/admin/customers/' + id + '/status', { status });
+    loadCustomers();
+  } catch (e) {
+    alert(e.message || 'Could not update customer');
+  }
+}
+
+loadCustomers();
+</script>
+</body>
+</html>

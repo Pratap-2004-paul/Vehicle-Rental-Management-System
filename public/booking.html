@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VRMS - Book Vehicle</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .booking-layout { display: flex; gap: 30px; padding: 30px 24px; max-width: 1000px; margin: 0 auto; flex-wrap: wrap; }
+  .vehicle-summary img { width: 100%; border-radius: var(--radius); height: 180px; object-fit: cover; margin-bottom: 12px; }
+  .vehicle-summary { flex: 1; min-width: 260px; }
+  .booking-form { flex: 1.3; min-width: 300px; }
+  .total-row { display:flex; justify-content:space-between; font-size:20px; font-weight:700; color: var(--navy); margin: 16px 0; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo">VRMS</div>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="vehicles.html">Vehicles</a></li>
+  </ul>
+  <div class="nav-actions" id="navGuestActions">
+    <a href="login.html" class="btn btn-outline">Login</a>
+    <a href="register.html" class="btn btn-primary">Register</a>
+  </div>
+  <div class="nav-actions hidden" id="navUserActions">
+    <a href="dashboard.html" class="btn btn-outline" id="navUserName">Dashboard</a>
+    <button class="btn btn-primary" onclick="logout()">Logout</button>
+  </div>
+</nav>
+
+<div class="breadcrumb" style="padding:16px 24px; max-width:1000px; margin:0 auto; font-size:13px; color:var(--text-muted);">
+  <a href="index.html" style="color:var(--blue-link)">Home</a> /
+  <a href="vehicles.html" style="color:var(--blue-link)">Vehicles</a> /
+  <span id="crumbName">Vehicle</span> / Book
+</div>
+
+<div class="booking-layout">
+  <div class="vehicle-summary card" id="vehicleSummary">
+    <div class="loading">Loading vehicle...</div>
+  </div>
+
+  <div class="booking-form card">
+    <h2 style="color:var(--navy); margin-bottom:16px;">Booking Details</h2>
+    <div id="formError" class="form-error hidden"></div>
+
+    <div class="form-group">
+      <label>Pick-up Location</label>
+      <input type="text" id="pickupLocation" placeholder="Enter pick-up location" required>
+    </div>
+    <div class="form-group">
+      <label>Pick-up Date</label>
+      <input type="date" id="pickupDate" required>
+    </div>
+    <div class="form-group">
+      <label>Return Date</label>
+      <input type="date" id="returnDate" required>
+    </div>
+
+    <div class="total-row">
+      <span>Total Amount</span>
+      <span>₹<span id="totalAmount">0</span></span>
+    </div>
+
+    <button class="btn btn-primary btn-block" id="confirmBtn" onclick="submitBooking()">Continue to Book</button>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/chatbot.js"></script>
+<script>
+requireAuth();
+
+const params = new URLSearchParams(window.location.search);
+const vehicleId = params.get('vehicle_id');
+let currentVehicle = null;
+
+async function loadVehicle() {
+  const box = document.getElementById('vehicleSummary');
+  if (!vehicleId) {
+    box.innerHTML = '<div class="empty-state">No vehicle selected.</div>';
+    return;
+  }
+  try {
+    const v = await api.get('/vehicles/' + vehicleId);
+    currentVehicle = v;
+    document.getElementById('crumbName').textContent = v.name;
+    box.innerHTML = `
+      <img src="${v.image || 'https://images.unsplash.com/photo-1502877338535-766e1452684a?w=500'}" alt="${v.name}">
+      <div style="font-weight:600; font-size:16px;">${v.name}</div>
+      <div style="color:var(--orange-dark); font-weight:700; margin:6px 0;">₹${v.price_per_day} / day</div>
+      <div style="font-size:13px; color:var(--text-muted);">${v.fuel_type}</div>
+      <div style="font-size:13px; color:var(--text-muted);">${v.transmission}</div>
+      <div style="font-size:13px; color:var(--text-muted);">${v.seats ? v.seats + ' Seater' : ''}</div>
+    `;
+  } catch (e) {
+    box.innerHTML = '<div class="empty-state">Vehicle not found.</div>';
+  }
+}
+
+function recalcTotal() {
+  const pickup = document.getElementById('pickupDate').value;
+  const ret = document.getElementById('returnDate').value;
+  const totalEl = document.getElementById('totalAmount');
+  if (!pickup || !ret || !currentVehicle) { totalEl.textContent = '0'; return; }
+
+  const days = Math.max(1, Math.round((new Date(ret) - new Date(pickup)) / (1000*60*60*24)));
+  if (days <= 0) { totalEl.textContent = '0'; return; }
+
+  totalEl.textContent = (days * currentVehicle.price_per_day).toLocaleString('en-IN');
+}
+
+document.getElementById('pickupDate').addEventListener('change', recalcTotal);
+document.getElementById('returnDate').addEventListener('change', recalcTotal);
+
+async function submitBooking() {
+  const errorBox = document.getElementById('formError');
+  const btn = document.getElementById('confirmBtn');
+  errorBox.classList.add('hidden');
+
+  const payload = {
+    vehicle_id: vehicleId,
+    pickup_location: document.getElementById('pickupLocation').value,
+    pickup_date: document.getElementById('pickupDate').value,
+    return_date: document.getElementById('returnDate').value,
+  };
+
+  if (!payload.pickup_location || !payload.pickup_date || !payload.return_date) {
+    errorBox.textContent = 'Please fill in all fields.';
+    errorBox.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Booking...';
+
+  try {
+    const data = await api.post('/bookings', payload);
+    window.location.href = 'payment.html?booking_id=' + data.booking.id;
+  } catch (err) {
+    let message = err.message;
+    if (err.errors) message = Object.values(err.errors).flat().join(' ');
+    errorBox.textContent = message;
+    errorBox.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Continue to Book';
+  }
+}
+
+loadVehicle();
+</script>
+</body>
+</html>

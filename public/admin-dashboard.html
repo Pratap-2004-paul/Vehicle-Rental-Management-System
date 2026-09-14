@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VRMS Admin - Dashboard</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .admin-layout { display: flex; width: 100%; min-height: calc(100vh - 65px); }
+  .sidebar { width: 220px; background: var(--navy); min-height: calc(100vh - 65px); padding: 20px 0; flex-shrink: 0; }
+  .sidebar a { display: block; padding: 12px 24px; color: #cbd5e1; font-size: 14px; }
+  .sidebar a.active, .sidebar a:hover { background: var(--navy-light); color: #fff; border-left: 3px solid var(--orange); }
+  .main { flex: 1; padding: 30px; }
+.main > * { max-width: 1100px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; }
+  .stat-card .label { font-size:12px; color:var(--text-muted); margin-bottom:6px; }
+  .stat-card .value { font-size:22px; font-weight:700; color:var(--navy); }
+  .recent-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); font-size:14px; }
+  @media (max-width: 800px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo">VRMS Admin</div>
+  <ul class="nav-links"><li><a href="index.html">View Site</a></li></ul>
+  <div class="nav-actions"><button class="btn btn-primary" onclick="logout()">Logout</button></div>
+</nav>
+
+<div class="admin-layout">
+  <aside class="sidebar">
+    <a href="admin-dashboard.html" class="active">Dashboard</a>
+    <a href="admin-vehicles.html">Vehicles</a>
+    <a href="admin-bookings.html">Bookings</a>
+    <a href="admin-customers.html">Customers</a>
+    <a href="admin-payments.html">Payments</a>
+    <a href="#" onclick="logout()">Logout</a>
+  </aside>
+
+  <main class="main">
+    <h2 style="color:var(--navy); margin-bottom:20px;">Dashboard</h2>
+    <div class="stats-grid" id="statsGrid"><div class="loading">Loading...</div></div>
+
+    <div class="card">
+      <h3 style="color:var(--navy); margin-bottom:12px;">Recent Bookings</h3>
+      <div id="recentBookings"><div class="loading">Loading...</div></div>
+      <a href="admin-bookings.html" class="btn btn-outline btn-block mt-20">View All</a>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+requireAdmin();
+
+async function loadStats() {
+  try {
+    const s = await api.get('/admin/stats');
+
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="stat-card"><div class="label">Total Vehicles</div><div class="value">${s.total_vehicles}</div></div>
+      <div class="stat-card"><div class="label">Total Bookings</div><div class="value">${s.total_bookings}</div></div>
+      <div class="stat-card"><div class="label">Total Customers</div><div class="value">${s.total_customers}</div></div>
+      <div class="stat-card"><div class="label">Total Revenue</div><div class="value">₹${Number(s.total_revenue).toLocaleString('en-IN')}</div></div>
+    `;
+
+    const recentHTML = s.recent_bookings.map(b => `
+      <div class="recent-row">
+        <span>${b.user?.name || '—'} — ${b.vehicle?.name || '—'}</span>
+        <span>₹${Number(b.total_amount).toLocaleString('en-IN')}</span>
+      </div>
+    `).join('') || '<div class="empty-state">No bookings yet.</div>';
+
+    document.getElementById('recentBookings').innerHTML = recentHTML;
+  } catch (e) {
+    document.getElementById('statsGrid').innerHTML = '<div class="empty-state">Could not load stats.</div>';
+  }
+}
+
+loadStats();
+</script>
+</body>
+</html>
