@@ -267,3 +267,17 @@ img { max-width: 100%; display: block; }
 .forgot-password a:hover {
     text-decoration: underline;
 }
+
+
+/* ---- Site Footer ---- */
+.site-footer { background: var(--navy); color: #cbd5e1; margin-top: 40px; }
+.footer-container {
+  max-width: 1200px; margin: 0 auto; padding: 40px 24px;
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 30px;
+}
+.footer-col h4 { color: #fff; margin-bottom: 14px; font-size: 14px; }
+.footer-col a, .footer-col p { display: block; font-size: 13px; color: #cbd5e1; margin-bottom: 8px; text-decoration: none; }
+.footer-col a:hover { color: var(--orange); }
+.footer-logo { font-weight: 700; font-size: 20px; color: #fff; margin-bottom: 10px; }
+.footer-bottom { border-top: 1px solid rgba(255,255,255,0.1); text-align: center; padding: 16px; font-size: 12px; color: #94a3b8; }
+@media (max-width: 800px) { .footer-container { grid-template-columns: 1fr 1fr; } }

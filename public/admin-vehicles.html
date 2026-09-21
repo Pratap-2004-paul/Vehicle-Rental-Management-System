@@ -67,7 +67,11 @@
       <div class="form-group"><label>Price / day (₹)</label><input type="number" id="vPrice" required></div>
       <div class="form-group"><label>Seats</label><input type="number" id="vSeats"></div>
       <div class="form-group"><label>Model Year</label><input type="number" id="vYear"></div>
-      <div class="form-group"><label>Image URL</label><input type="text" id="vImage" placeholder="https://..."></div>
+      <div class="form-group">
+  <label>Vehicle Image</label>
+  <input type="file" id="vImage" accept="image/*">
+  <img id="vImagePreview" style="width:100%; max-height:140px; object-fit:cover; border-radius:6px; margin-top:8px; display:none;">
+</div>
       <div class="form-group"><label>Status</label>
         <select id="vStatus"><option value="available">Available</option><option value="maintenance">Maintenance</option><option value="unavailable">Unavailable</option></select>
       </div>
@@ -132,7 +136,8 @@ function editVehicle(v) {
   document.getElementById('vPrice').value = v.price_per_day;
   document.getElementById('vSeats').value = v.seats || '';
   document.getElementById('vYear').value = v.model_year || '';
-  document.getElementById('vImage').value = v.image || '';
+  document.getElementById('vImagePreview').src = v.image || '';
+  document.getElementById('vImagePreview').style.display = v.image ? 'block' : 'none';
   document.getElementById('vStatus').value = v.status;
   document.getElementById('modalError').classList.add('hidden');
   document.getElementById('modal').classList.remove('hidden');
@@ -142,6 +147,15 @@ function closeModal() {
   document.getElementById('modal').classList.add('hidden');
 }
 
+document.getElementById('vImage').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  const preview = document.getElementById('vImagePreview');
+  if (file) {
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+  }
+});
+
 document.getElementById('vehicleForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const errorBox = document.getElementById('modalError');
@@ -149,32 +163,36 @@ document.getElementById('vehicleForm').addEventListener('submit', async (e) => {
   errorBox.classList.add('hidden');
 
   const id = document.getElementById('vId').value;
-  const payload = {
-    name: document.getElementById('vName').value,
-    type: document.getElementById('vType').value,
-    fuel_type: document.getElementById('vFuel').value,
-    transmission: document.getElementById('vTransmission').value,
-    price_per_day: document.getElementById('vPrice').value,
-    seats: document.getElementById('vSeats').value || null,
-    model_year: document.getElementById('vYear').value || null,
-    image: document.getElementById('vImage').value || null,
-    status: document.getElementById('vStatus').value,
-  };
+  const formData = new FormData();
+  formData.append('name', document.getElementById('vName').value);
+  formData.append('type', document.getElementById('vType').value);
+  formData.append('fuel_type', document.getElementById('vFuel').value);
+  formData.append('transmission', document.getElementById('vTransmission').value);
+  formData.append('price_per_day', document.getElementById('vPrice').value);
+  formData.append('seats', document.getElementById('vSeats').value || '');
+  formData.append('model_year', document.getElementById('vYear').value || '');
+  formData.append('status', document.getElementById('vStatus').value);
+  const imageFile = document.getElementById('vImage').files[0];
+  if (imageFile) formData.append('image', imageFile);
+  if (id) formData.append('_method', 'PUT'); // Laravel trick: lets file uploads work on "updates" too
 
   btn.disabled = true; btn.textContent = 'Saving...';
 
   try {
-    if (id) {
-      await api.put('/vehicles/' + id, payload);
-    } else {
-      await api.post('/vehicles', payload);
-    }
+    const token = getToken();
+    const response = await fetch('/api' + (id ? '/vehicles/' + id : '/vehicles'), {
+      method: 'POST', // always POST — Laravel reads _method for updates
+      headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' },
+      body: formData,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || (data.errors ? Object.values(data.errors).flat().join(' ') : 'Save failed'));
+
     closeModal();
+    if (typeof showToast === 'function') showToast('Vehicle saved successfully', 'success');
     loadVehicles();
   } catch (err) {
-    let message = err.message;
-    if (err.errors) message = Object.values(err.errors).flat().join(' ');
-    errorBox.textContent = message;
+    errorBox.textContent = err.message;
     errorBox.classList.remove('hidden');
   } finally {
     btn.disabled = false; btn.textContent = 'Save';

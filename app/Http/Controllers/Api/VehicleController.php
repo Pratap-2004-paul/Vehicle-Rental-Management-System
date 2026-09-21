@@ -45,29 +45,42 @@ $vehicles = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
     // POST /api/vehicles (admin only)
     public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'type' => 'required|string',
-            'fuel_type' => 'required|string',
-            'transmission' => 'required|string',
-            'price_per_day' => 'required|numeric|min:0',
-            'seats' => 'nullable|integer',
-            'model_year' => 'nullable|integer',
-            'description' => 'nullable|string',
-            'features' => 'nullable|array',
-            'image' => 'nullable|string',
-            'status' => 'nullable|in:available,maintenance,unavailable',
-        ]);
+{
+    $validator = Validator::make($request->all(), [
+        'name' => 'required|string|max:255',
+        'type' => 'required|string',
+        'fuel_type' => 'required|string',
+        'transmission' => 'required|string',
+        'price_per_day' => 'required|numeric|min:0',
+        'seats' => 'nullable|integer',
+        'model_year' => 'nullable|integer',
+        'description' => 'nullable|string',
+        'features' => 'nullable|array',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+        'status' => 'nullable|in:available,maintenance,unavailable',
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $vehicle = Vehicle::create($validator->validated());
-
-        return response()->json(['message' => 'Vehicle added', 'vehicle' => $vehicle], 201);
+    if ($validator->fails()) {
+        return response()->json([
+            'errors' => $validator->errors()
+        ], 422);
     }
+
+    $data = $validator->validated();
+
+    // Upload vehicle image
+    if ($request->hasFile('image')) {
+        $path = $request->file('image')->store('vehicles', 'public');
+        $data['image'] = '/storage/' . $path;
+    }
+
+    $vehicle = Vehicle::create($data);
+
+    return response()->json([
+        'message' => 'Vehicle added',
+        'vehicle' => $vehicle
+    ], 201);
+}
 
 
     // GET /api/vehicles/{id}
@@ -84,34 +97,50 @@ $vehicles = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
     // PUT /api/vehicles/{id} (admin only)
     public function update(Request $request, $id)
-    {
-        $vehicle = Vehicle::find($id);
-        if (! $vehicle) {
-            return response()->json(['message' => 'Vehicle not found'], 404);
-        }
+{
+    $vehicle = Vehicle::find($id);
 
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|string|max:255',
-            'type' => 'sometimes|string',
-            'fuel_type' => 'sometimes|string',
-            'transmission' => 'sometimes|string',
-            'price_per_day' => 'sometimes|numeric|min:0',
-            'seats' => 'nullable|integer',
-            'model_year' => 'nullable|integer',
-            'description' => 'nullable|string',
-            'features' => 'nullable|array',
-            'image' => 'nullable|string',
-            'status' => 'nullable|in:available,maintenance,unavailable',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $vehicle->update($validator->validated());
-
-        return response()->json(['message' => 'Vehicle updated', 'vehicle' => $vehicle]);
+    if (! $vehicle) {
+        return response()->json([
+            'message' => 'Vehicle not found'
+        ], 404);
     }
+
+    $validator = Validator::make($request->all(), [
+        'name' => 'sometimes|string|max:255',
+        'type' => 'sometimes|string',
+        'fuel_type' => 'sometimes|string',
+        'transmission' => 'sometimes|string',
+        'price_per_day' => 'sometimes|numeric|min:0',
+        'seats' => 'nullable|integer',
+        'model_year' => 'nullable|integer',
+        'description' => 'nullable|string',
+        'features' => 'nullable|array',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+        'status' => 'nullable|in:available,maintenance,unavailable',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'errors' => $validator->errors()
+        ], 422);
+    }
+
+    $data = $validator->validated();
+
+    // Upload new vehicle image
+    if ($request->hasFile('image')) {
+        $path = $request->file('image')->store('vehicles', 'public');
+        $data['image'] = '/storage/' . $path;
+    }
+
+    $vehicle->update($data);
+
+    return response()->json([
+        'message' => 'Vehicle updated',
+        'vehicle' => $vehicle
+    ]);
+}
 
     // DELETE /api/vehicles/{id} (admin only)
     public function destroy($id)
